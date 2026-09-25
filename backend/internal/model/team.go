@@ -27,11 +27,11 @@ type TeamMember struct {
 type Registration struct {
 	ID           int64      `gorm:"primaryKey" json:"id"`
 	TeamID       int64      `gorm:"index;not null;uniqueIndex:idx_team_activity" json:"team_id"`
-	ActivityID   int64      `gorm:"index;not null;uniqueIndex:idx_team_activity" json:"activity_id"`
-	Status       string     `gorm:"size:20;default:pending;not null;index" json:"status"`
+	ActivityID   int64      `gorm:"index;not null;uniqueIndex:idx_team_activity;index:idx_activity_status_time,priority:1" json:"activity_id"`
+	Status       string     `gorm:"size:20;default:pending;not null;index;index:idx_activity_status_time,priority:2" json:"status"`
 	StartTime    *time.Time `json:"start_time"`
 	FinishTime   *time.Time `json:"finish_time"`
 	TotalSeconds int        `gorm:"default:0;not null" json:"total_seconds"`
-	RegisteredAt time.Time  `json:"registered_at"`
+	RegisteredAt time.Time  `gorm:"index:idx_activity_status_time,priority:3" json:"registered_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 }

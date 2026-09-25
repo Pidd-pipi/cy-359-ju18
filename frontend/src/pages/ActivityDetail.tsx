@@ -48,8 +48,13 @@ export default function ActivityDetail() {
     }
     setLoading(true)
     try {
-      await teamApi.applyActivity({ team_id: selectedTeam, activity_id: activityId })
-      message.success('报名成功，等待管理员审核')
+      const res = await teamApi.applyActivity({ team_id: selectedTeam, activity_id: activityId })
+      // 后端在名额满时返回 waitlist 状态及前面队伍数
+      if (res.data?.status === 'waitlist') {
+        message.success(`名额已满，已进入候补，前面还有 ${res.data.waitlist_ahead ?? 0} 队`)
+      } else {
+        message.success('报名成功，等待管理员审核')
+      }
       load()
     } catch {
       // 已提示

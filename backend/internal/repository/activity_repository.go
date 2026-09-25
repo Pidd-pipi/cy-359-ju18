@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/orienteering/platform/internal/constants"
 	"github.com/orienteering/platform/internal/model"
 )
 
@@ -98,7 +99,7 @@ func (r *ActivityRepository) CountRegistrations(activityID int64) (int64, error)
 	var count int64
 	if err := r.db.Model(&model.Registration{}).
 		Where("activity_id = ? AND status IN ?", activityID,
-			[]string{"approved", "finished"}).Count(&count).Error; err != nil {
+			constants.OccupiedRegistrationStatuses).Count(&count).Error; err != nil {
 		return 0, fmt.Errorf("count registrations: %w", err)
 	}
 	return count, nil

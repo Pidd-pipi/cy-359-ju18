@@ -32,6 +32,7 @@ export const CheckinType = {
 
 export const RegistrationStatus = {
   PENDING: 'pending',
+  WAITLIST: 'waitlist',
   APPROVED: 'approved',
   REJECTED: 'rejected',
   FINISHED: 'finished',
@@ -79,6 +80,7 @@ export const statusConfig: Record<StatusDomain, Record<string, { color: string; 
   },
   registration: {
     [RegistrationStatus.PENDING]: { color: 'default', text: '待审核' },
+    [RegistrationStatus.WAITLIST]: { color: 'warning', text: '候补' },
     [RegistrationStatus.APPROVED]: { color: 'processing', text: '已通过' },
     [RegistrationStatus.REJECTED]: { color: 'error', text: '已拒绝' },
     [RegistrationStatus.FINISHED]: { color: 'success', text: '已完成' },

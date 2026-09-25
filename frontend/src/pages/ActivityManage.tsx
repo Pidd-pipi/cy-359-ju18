@@ -8,8 +8,9 @@ import * as checkpointApi from '../api/checkpoint'
 import * as teamApi from '../api/team'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
+import RegistrationStatusTag from '../components/RegistrationStatusTag'
 import { useAuth } from '../hooks/useAuth'
-import { ActivityStatus, Difficulty, TaskType } from '../constants'
+import { ActivityStatus, Difficulty, RegistrationStatus, TaskType } from '../constants'
 import { formatDateTime } from '../utils/format'
 
 export default function ActivityManage() {
@@ -263,26 +264,41 @@ function CheckpointManager({ activity, onClose, onChanged }: { activity: activit
   const onRegistrations = async () => {
     if (!activity) return
     const res = await teamApi.listRegistrationsByActivity(activity.id)
+    const regs = res.data
     Modal.info({
-      title: `报名列表（${activity.title}）`,
-      width: 640,
+      title: `报名列表（${activity.title}） 名额 ${activity.max_teams} 队`,
+      width: 720,
       content: (
         <Table
           size="small"
           rowKey="id"
-          dataSource={res.data}
+          dataSource={regs}
           pagination={false}
+          rowClassName={(r) => (r.status === RegistrationStatus.WAITLIST ? 'ant-table-row-warning' : '')}
           columns={[
             { title: '报名 ID', dataIndex: 'id', width: 80 },
             { title: '团队 ID', dataIndex: 'team_id', width: 90 },
-            { title: '状态', dataIndex: 'status' },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              render: (v: string, r: teamApi.Registration) => (
+                <RegistrationStatusTag status={v} waitlistAhead={r.waitlist_ahead} />
+              ),
+            },
             { title: '用时', dataIndex: 'duration' },
             {
               title: '操作',
               render: (_, r) => (
                 <Space>
-                  <Button size="small" type="primary" onClick={async () => { await teamApi.approveRegistration(r.id); message.success('已通过'); onRegistrations(); }}>通过</Button>
-                  <Button size="small" danger onClick={async () => { await teamApi.rejectRegistration(r.id); message.success('已拒绝'); onRegistrations(); }}>拒绝</Button>
+                  {r.status === RegistrationStatus.PENDING && (
+                    <Button size="small" type="primary" onClick={async () => { await teamApi.approveRegistration(r.id); message.success('已通过'); onRegistrations(); }}>通过</Button>
+                  )}
+                  {(r.status === RegistrationStatus.PENDING || r.status === RegistrationStatus.WAITLIST) && (
+                    <Button size="small" danger onClick={async () => { await teamApi.rejectRegistration(r.id); message.success(r.status === RegistrationStatus.PENDING ? '已拒绝，最早候补已自动补为待审核' : '已移除候补'); onRegistrations(); }}>拒绝</Button>
+                  )}
+                  {r.status !== RegistrationStatus.PENDING && r.status !== RegistrationStatus.WAITLIST && (
+                    <span style={{ color: '#999' }}>—</span>
+                  )}
                 </Space>
               ),
             },

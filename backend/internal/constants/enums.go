@@ -38,6 +38,7 @@ const (
 // 报名状态枚举（数据库 registrations.status 字段）。
 const (
 	RegistrationStatusPending  = "pending"  // 待审核
+	RegistrationStatusWaitlist = "waitlist" // 候补（名额已满，按提交顺序排队）
 	RegistrationStatusApproved = "approved" // 已通过
 	RegistrationStatusRejected = "rejected" // 已拒绝
 	RegistrationStatusFinished = "finished" // 已完成
@@ -87,8 +88,14 @@ var AllDifficulties = []string{DifficultyFamily, DifficultyAdult, DifficultyPro}
 
 // AllRegistrationStatuses 报名状态完整列表。
 var AllRegistrationStatuses = []string{
-	RegistrationStatusPending, RegistrationStatusApproved,
+	RegistrationStatusPending, RegistrationStatusWaitlist, RegistrationStatusApproved,
 	RegistrationStatusRejected, RegistrationStatusFinished,
+}
+
+// OccupiedRegistrationStatuses 占用活动名额的报名状态：待审核与已通过（含已完成）均占位，
+// 候补不占位，被拒绝后释放名额。
+var OccupiedRegistrationStatuses = []string{
+	RegistrationStatusPending, RegistrationStatusApproved, RegistrationStatusFinished,
 }
 
 // AllRedemptionStatuses 兑换状态完整列表。

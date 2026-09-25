@@ -78,6 +78,8 @@ func RegistrationStatusText(status string) string {
 	switch status {
 	case constants.RegistrationStatusPending:
 		return "待审核"
+	case constants.RegistrationStatusWaitlist:
+		return "候补"
 	case constants.RegistrationStatusApproved:
 		return "已通过"
 	case constants.RegistrationStatusRejected:
@@ -135,6 +137,8 @@ func StatusColor(status string) string {
 	switch status {
 	case constants.ActivityStatusDraft, constants.RegistrationStatusPending:
 		return "default"
+	case constants.RegistrationStatusWaitlist:
+		return "warning"
 	case constants.ActivityStatusPublished, constants.RegistrationStatusApproved, constants.ProductStatusOn:
 		return "processing"
 	case constants.ActivityStatusOngoing, constants.CheckinResultCorrect:

@@ -264,9 +264,12 @@ curl -sS http://localhost:29519/healthz
 - 后端：`internal/constants/enums.go`、`internal/model/checkpoint.go`、`internal/model/checkin_record.go`、`internal/dto/checkpoint_dto.go`（oneof）、`internal/dto/checkin_dto.go`（oneof）、`internal/service/checkin_service.go`（答题/拍照/GPS 距离校验）、`internal/util/formatters.go`（TaskTypeText）、`internal/constants/messages.go`（MsgWrongAnswer）
 - 前端：`src/constants/index.ts`（TaskType/CheckinType/taskTypeConfig）、`src/pages/ActivityDetail.tsx`、`src/pages/ActivityManage.tsx`（打卡点表单）、`src/pages/Checkin.tsx`（打卡方式与答题）
 
-### 枚举 5：报名状态 RegistrationStatus（pending / approved / rejected / finished）
-- 后端：`internal/constants/enums.go`、`internal/model/team.go`（Registration）、`internal/service/registration_service.go`（审核状态机）、`internal/service/checkin_service.go`（仅 approved 可打卡、完成后置 finished）、`internal/service/leaderboard_service.go`（榜单只统计 approved/finished）、`internal/handler/registration_handler.go`、`internal/util/formatters.go`（RegistrationStatusText）、`internal/constants/log_templates.go`（LogTeamApprove/LogTeamFinish）
-- 前端：`src/constants/index.ts`（RegistrationStatus）、`src/pages/TeamDetail.tsx`、`src/pages/ActivityManage.tsx`（审核报名）、`src/components/Leaderboard.tsx`、`src/components/StatusBadge.tsx`
+### 枚举 5：报名状态 RegistrationStatus（pending / waitlist / approved / rejected / finished）
+- 名额规则：**待审核（pending）也占用名额**，占用名额的状态为 pending/approved/finished；名额不足时新报名按提交顺序进入候补（waitlist），不占名额。
+- 自动补位：管理员拒绝一条待审核报名后，同一事务内把**最早候补**（按 `registered_at, id` 升序）自动提升为待审核；拒绝候补不触发补位。
+- 并发安全：报名事务对活动行 `SELECT ... FOR UPDATE` 后行内计数，同队重复提交由唯一索引 `idx_team_activity` 兜底；审核/拒绝使用行锁 + 状态 CAS 条件更新，两个管理员同时操作只有一个成功，名额不会多出。
+- 后端：`internal/constants/enums.go`、`internal/model/team.go`（Registration）、`internal/service/registration_service.go`（候补状态机）、`internal/repository/team_repository.go`（CountOccupied/GetEarliestWaitlist/CountWaitlistAhead/UpdateStatusIf）、`internal/service/checkin_service.go`（仅 approved 可打卡、完成后置 finished）、`internal/service/leaderboard_service.go`（榜单只统计 approved/finished）、`internal/handler/registration_handler.go`、`internal/util/formatters.go`（RegistrationStatusText）、`internal/constants/log_templates.go`（LogTeamApply/LogTeamFinish）
+- 前端：`src/constants/index.ts`（RegistrationStatus）、`src/components/RegistrationStatusTag.tsx`（候补显示前面几队）、`src/pages/TeamDetail.tsx`、`src/pages/ActivityManage.tsx`（审核报名）、`src/components/Leaderboard.tsx`、`src/components/StatusBadge.tsx`
 
 ### 枚举 6：商品/兑换（ProductType、ProductStatus、RedemptionStatus）
 - 后端：`internal/constants/enums.go`、`internal/model/product.go`、`internal/model/redemption.go`、`internal/dto/product_dto.go`（oneof）、`internal/service/redemption_service.go`（兑换状态机：pending→completed/cancelled）、`internal/service/product_service.go`、`internal/handler/product_handler.go`、`internal/handler/redemption_handler.go`、`internal/util/formatters.go`（RedemptionStatusText/ProductTypeText/StatusColor）

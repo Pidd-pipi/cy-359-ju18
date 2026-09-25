@@ -3,9 +3,11 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/orienteering/platform/internal/constants"
 	"github.com/orienteering/platform/internal/model"
 )
 
@@ -150,12 +152,92 @@ func (r *RegistrationRepository) GetByTeamAndActivity(teamID, activityID int64) 
 	return &reg, nil
 }
 
+// GetByTeamAndActivityTx 事务内查询某团队在某活动的报名记录（不存在返回 ErrNotFound）。
+func (r *RegistrationRepository) GetByTeamAndActivityTx(tx *gorm.DB, teamID, activityID int64) (*model.Registration, error) {
+	var reg model.Registration
+	if err := tx.Where("team_id = ? AND activity_id = ?", teamID, activityID).First(&reg).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("get registration by team/activity tx: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("get registration by team/activity tx: %w", err)
+	}
+	return &reg, nil
+}
+
 func (r *RegistrationRepository) UpdateStatus(tx *gorm.DB, id int64, status string) error {
 	if err := tx.Model(&model.Registration{}).Where("id = ?", id).
 		Update("status", status).Error; err != nil {
 		return fmt.Errorf("update registration status: %w", err)
 	}
 	return nil
+}
+
+// UpdateStatusIf 仅当报名记录当前状态为 expect 时才更新为 next（CAS 条件更新，防止两个管理员并发操作）。
+// 返回受影响行数：0 表示状态已被其他事务改动。
+func (r *RegistrationRepository) UpdateStatusIf(tx *gorm.DB, id int64, expect, next string) (int64, error) {
+	res := tx.Model(&model.Registration{}).
+		Where("id = ? AND status = ?", id, expect).
+		Update("status", next)
+	if res.Error != nil {
+		return 0, fmt.Errorf("update registration status if: %w", res.Error)
+	}
+	return res.RowsAffected, nil
+}
+
+// GetByIDForUpdate 行锁查询报名记录，供审核/拒绝事务使用。
+func (r *RegistrationRepository) GetByIDForUpdate(tx *gorm.DB, id int64) (*model.Registration, error) {
+	var reg model.Registration
+	if err := tx.Clauses(lockedClause()).First(&reg, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("get registration for update: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("get registration for update: %w", err)
+	}
+	return &reg, nil
+}
+
+// CountOccupied 统计活动当前占用名额的报名数（待审核 + 已通过 + 已完成）。
+// 必须在持有活动行锁的事务内调用，以保证计数与插入的原子性。
+func (r *RegistrationRepository) CountOccupied(tx *gorm.DB, activityID int64) (int64, error) {
+	var count int64
+	if err := tx.Model(&model.Registration{}).
+		Where("activity_id = ? AND status IN ?", activityID,
+			constants.OccupiedRegistrationStatuses).Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count occupied registrations: %w", err)
+	}
+	return count, nil
+}
+
+// GetEarliestWaitlist 行锁取出活动最早提交的候补队伍（按提交时间、id 升序）。
+func (r *RegistrationRepository) GetEarliestWaitlist(tx *gorm.DB, activityID int64) (*model.Registration, error) {
+	var reg model.Registration
+	err := tx.Clauses(lockedClause()).
+		Where("activity_id = ? AND status = ?", activityID, constants.RegistrationStatusWaitlist).
+		Order("registered_at ASC, id ASC").First(&reg).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get earliest waitlist: %w", err)
+	}
+	return &reg, nil
+}
+
+// CountWaitlistAhead 统计指定候补记录前面还有多少候补队伍（按提交时间、id 升序排队）。
+func (r *RegistrationRepository) CountWaitlistAhead(tx *gorm.DB, activityID int64, registeredAt time.Time, selfID int64) (int64, error) {
+	var count int64
+	if err := tx.Model(&model.Registration{}).
+		Where("activity_id = ? AND status = ? AND (registered_at < ? OR (registered_at = ? AND id < ?))",
+			activityID, constants.RegistrationStatusWaitlist, registeredAt, registeredAt, selfID).
+		Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count waitlist ahead: %w", err)
+	}
+	return count, nil
+}
+
+// CountWaitlistAheadDB 非事务版本：查询单条候补记录前面还有多少队伍。
+func (r *RegistrationRepository) CountWaitlistAheadDB(activityID int64, registeredAt time.Time, selfID int64) (int64, error) {
+	return r.CountWaitlistAhead(r.db, activityID, registeredAt, selfID)
 }
 
 func (r *RegistrationRepository) Update(tx *gorm.DB, reg *model.Registration) error {
@@ -175,7 +257,9 @@ func (r *RegistrationRepository) ListByTeam(teamID int64) ([]model.Registration,
 
 func (r *RegistrationRepository) ListByActivity(activityID int64) ([]model.Registration, error) {
 	var regs []model.Registration
-	if err := r.db.Where("activity_id = ?", activityID).Order("total_seconds ASC, id ASC").Find(&regs).Error; err != nil {
+	// 按提交顺序展示（待审核/候补排队顺序），排行榜会自行重排。
+	if err := r.db.Where("activity_id = ?", activityID).
+		Order("registered_at ASC, id ASC").Find(&regs).Error; err != nil {
 		return nil, fmt.Errorf("list registrations by activity: %w", err)
 	}
 	return regs, nil

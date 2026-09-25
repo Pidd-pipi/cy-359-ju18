@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS registrations (
     UNIQUE (team_id, activity_id)
 );
 CREATE INDEX IF NOT EXISTS idx_registrations_status ON registrations(status);
+-- 候补排队/名额统计：按活动 + 状态 + 提交时间取最早候补
+CREATE INDEX IF NOT EXISTS idx_registrations_activity_status_time
+    ON registrations(activity_id, status, registered_at);
 
 CREATE TABLE IF NOT EXISTS checkin_records (
     id            BIGSERIAL PRIMARY KEY,

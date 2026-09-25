@@ -24,6 +24,7 @@ export interface Registration {
   activity_id: number
   activity_title: string
   status: string
+  waitlist_ahead: number
   start_time?: string
   finish_time?: string
   total_seconds: number

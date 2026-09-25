@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 	"github.com/orienteering/platform/internal/constants"
 	"github.com/orienteering/platform/internal/dto"
 	"github.com/orienteering/platform/internal/middleware"
-	"github.com/orienteering/platform/internal/model"
 	"github.com/orienteering/platform/internal/service"
 	"github.com/orienteering/platform/internal/util"
 )
@@ -38,7 +38,16 @@ func (h *RegistrationHandler) Apply(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	util.OKMessage(c, constants.MsgRegistered, reg)
+	view, err := h.svc.ToView(reg)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	msg := constants.MsgRegistered
+	if reg.Status == constants.RegistrationStatusWaitlist {
+		msg = fmt.Sprintf("活动名额已满，已进入候补，前面还有 %d 队", view.WaitlistAhead)
+	}
+	util.OKMessage(c, msg, view)
 }
 
 // Approve 管理员通过报名。
@@ -83,7 +92,12 @@ func (h *RegistrationHandler) ListByActivity(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	util.OK(c, toRegistrationViews(regs))
+	views, err := h.svc.ToViews(regs)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	util.OK(c, views)
 }
 
 // ListMine 我的报名记录。
@@ -93,13 +107,10 @@ func (h *RegistrationHandler) ListMine(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	util.OK(c, toRegistrationViews(regs))
-}
-
-func toRegistrationViews(regs []model.Registration) []dto.RegistrationView {
-	views := make([]dto.RegistrationView, 0, len(regs))
-	for i := range regs {
-		views = append(views, service.ToRegistrationView(&regs[i], "", ""))
+	views, err := h.svc.ToViews(regs)
+	if err != nil {
+		respondError(c, err)
+		return
 	}
-	return views
+	util.OK(c, views)
 }
