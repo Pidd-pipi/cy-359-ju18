@@ -6,13 +6,14 @@ import * as teamApi from '../api/team'
 import { useTeamStore } from '../stores/teamStore'
 import PageHeader from '../components/PageHeader'
 import EmptyState from '../components/EmptyState'
+import RegistrationStatusTag from '../components/RegistrationStatusTag'
 import { useAuth } from '../hooks/useAuth'
 import { confirmAction } from '../components/ConfirmDialog'
 
 export default function TeamList() {
   useAuth()
   const navigate = useNavigate()
-  const { myTeams, fetchMyTeams, fetchMyRegistrations } = useTeamStore()
+  const { myTeams, myRegistrations, fetchMyTeams, fetchMyRegistrations } = useTeamStore()
   const [open, setOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
   const [form] = Form.useForm()
@@ -96,6 +97,23 @@ export default function TeamList() {
               >
                 <Typography.Paragraph type="secondary">{team.slogan || '暂无口号'}</Typography.Paragraph>
                 <Typography.Text>成员 {team.member_count} 人</Typography.Text>
+                {myRegistrations.filter((r) => r.team_id === team.id).length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>报名状态：</Typography.Text>
+                    <Space size={[8, 4]} wrap style={{ marginTop: 4 }}>
+                      {myRegistrations
+                        .filter((r) => r.team_id === team.id)
+                        .map((r) => (
+                          <Space key={r.id} size={4}>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              {r.activity_title || `活动 #${r.activity_id}`}
+                            </Typography.Text>
+                            <RegistrationStatusTag status={r.status} waitlistAhead={r.waitlist_ahead} />
+                          </Space>
+                        ))}
+                    </Space>
+                  </div>
+                )}
               </Card>
             </List.Item>
           )}

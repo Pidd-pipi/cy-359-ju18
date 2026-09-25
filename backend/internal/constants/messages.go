@@ -27,6 +27,8 @@ const (
 	MsgAlreadyJoined = "用户[%s]已加入团队[%s]"
 	MsgTeamFull      = "团队[%d]人数已满"
 	MsgAlreadyApplied = "团队[%s]已报名活动[%s]"
+	MsgWaitlisted     = "活动[%s]名额已满[%d/%d]，团队已进入候补队列，前面还有[%d]队"
+	MsgPromotedFromWaitlist = "报名已拒绝，候补队列第[%d]队（报名记录[%d]）自动递补为待审核"
 	MsgPointsNotEnough = "用户[%s]积分[%d]不足，兑换需要[%d]"
 	MsgStockNotEnough = "商品[%s]库存[%d]不足"
 	MsgNotRegistered  = "团队[%d]未报名活动[%s]"

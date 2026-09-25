@@ -32,6 +32,7 @@ export default function ActivityCard({ activity, onClick, extra }: Props) {
           <Tag color="blue">{difficultyConfig[activity.difficulty] || activity.difficulty}</Tag>
           <Tag icon={<ClockCircleOutlined />}>{activity.duration_minutes} 分钟</Tag>
           <Tag icon={<TeamOutlined />}>已报名 {activity.team_count}/{activity.max_teams}</Tag>
+          {activity.waitlist_count > 0 && <Tag color="orange">候补 {activity.waitlist_count}</Tag>}
           <Tag icon={<EnvironmentOutlined />}>{activity.address}</Tag>
         </Space>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>

@@ -141,13 +141,18 @@ func (s *ActivityService) CountCheckpoints(activityID int64) (int64, error) {
 	return s.repo.CountCheckpoints(activityID)
 }
 
-// CountRegistrations 复用：统计活动已报名团队数量。
+// CountRegistrations 复用：统计活动已占用名额的团队数量（待审核 + 已通过 + 已完成）。
 func (s *ActivityService) CountRegistrations(activityID int64) (int64, error) {
 	return s.repo.CountRegistrations(activityID)
 }
 
+// CountWaitlisted 复用：统计活动候补队列中的团队数量。
+func (s *ActivityService) CountWaitlisted(activityID int64) (int64, error) {
+	return s.repo.CountWaitlisted(activityID)
+}
+
 // ToView 转换为展示视图。
-func ToActivityView(a *model.Activity, checkpointCount, teamCount int64) dto.ActivityView {
+func ToActivityView(a *model.Activity, checkpointCount, teamCount, waitlistCount int64) dto.ActivityView {
 	cps := make([]dto.CheckpointView, 0, len(a.Checkpoints))
 	for _, cp := range a.Checkpoints {
 		cps = append(cps, ToCheckpointView(&cp))
@@ -171,6 +176,7 @@ func ToActivityView(a *model.Activity, checkpointCount, teamCount int64) dto.Act
 		MaxTeams:             a.MaxTeams,
 		CheckpointCount:      int(checkpointCount),
 		TeamCount:            int(teamCount),
+		WaitlistCount:        int(waitlistCount),
 		Checkpoints:          cps,
 		CreatedAt:            a.CreatedAt,
 	}

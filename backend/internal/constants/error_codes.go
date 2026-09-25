@@ -24,4 +24,5 @@ const (
 	CodeActivityClosed = 40908 // 活动不在可操作状态
 	CodeAlreadyFavored = 40909 // 已收藏该线路
 	CodeAlreadyMember  = 40910 // 已是该团队队员
+	CodeWaitlisted     = 40911 // 名额不足，已进入候补队列
 )

@@ -4,6 +4,7 @@ import { Card, Descriptions, List, Tag, Space, Button, Table } from 'antd'
 import * as teamApi from '../api/team'
 import * as checkinApi from '../api/checkin'
 import StatusBadge from '../components/StatusBadge'
+import RegistrationStatusTag from '../components/RegistrationStatusTag'
 import PageHeader from '../components/PageHeader'
 import { useAuth } from '../hooks/useAuth'
 import { formatDateTime, formatDuration } from '../utils/format'
@@ -66,8 +67,10 @@ export default function TeamDetail() {
           dataSource={registrations}
           pagination={false}
           columns={[
-            { title: '活动', dataIndex: 'activity_title' },
-            { title: '状态', dataIndex: 'status', render: (v: string) => <StatusBadge status={v} domain="registration" /> },
+            { title: '活动', dataIndex: 'activity_title', render: (v: string, r: teamApi.Registration) => v || `活动 #${r.activity_id}` },
+            { title: '状态', dataIndex: 'status', render: (_: string, r: teamApi.Registration) => (
+              <RegistrationStatusTag status={r.status} waitlistAhead={r.waitlist_ahead} />
+            ) },
             { title: '用时', dataIndex: 'duration' },
             { title: '报名时间', dataIndex: 'registered_at', render: (v: string) => formatDateTime(v) },
             {

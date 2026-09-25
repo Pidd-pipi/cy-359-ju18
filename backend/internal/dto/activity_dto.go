@@ -39,6 +39,7 @@ type ActivityView struct {
 	MaxTeams             int            `json:"max_teams"`
 	CheckpointCount      int            `json:"checkpoint_count"`
 	TeamCount            int            `json:"team_count"`
+	WaitlistCount        int            `json:"waitlist_count"`
 	Checkpoints          []CheckpointView `json:"checkpoints,omitempty"`
 	CreatedAt            time.Time      `json:"created_at"`
 }

@@ -25,8 +25,10 @@ const (
 
 	LogTeamCreate    = "team create name=%s captain_id=%d"
 	LogTeamJoin      = "team join team_id=%d user_id=%d role=%s"
-	LogTeamApply     = "team apply team_id=%d activity_id=%d"
+	LogTeamApply     = "team apply team_id=%d activity_id=%d status=%s occupied=%d max=%d"
 	LogTeamApprove   = "team approve registration_id=%d team_id=%d"
+	LogTeamReject    = "team reject registration_id=%d team_id=%d promoted_registration_id=%d"
+	LogTeamWaitlistPromote = "team waitlist promote activity_id=%d registration_id=%d team_id=%d"
 	LogTeamFinish    = "team finish registration_id=%d total_seconds=%d"
 
 	LogCheckin      = "checkin checkpoint_id=%d team_id=%d type=%s result=%s points=%d"

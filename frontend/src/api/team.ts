@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResponse } from '../utils/request'
 
 export interface TeamMember {
   user_id: number
@@ -24,6 +25,8 @@ export interface Registration {
   activity_id: number
   activity_title: string
   status: string
+  /** 候补时前面还有多少队（仅 status=waitlisted） */
+  waitlist_ahead: number
   start_time?: string
   finish_time?: string
   total_seconds: number
@@ -56,7 +59,8 @@ export function leaveTeam(teamId: number) {
 }
 
 export function applyActivity(data: { team_id: number; activity_id: number }) {
-  return request.post('/registrations', data)
+  // 响应拦截器已解包为统一响应体 { code, message, data }
+  return request.post('/registrations', data) as unknown as Promise<ApiResponse<Registration>>
 }
 
 export function listMyRegistrations() {
@@ -72,5 +76,5 @@ export function approveRegistration(id: number) {
 }
 
 export function rejectRegistration(id: number) {
-  return request.post(`/registrations/${id}/reject`)
+  return request.post(`/registrations/${id}/reject`) as unknown as Promise<ApiResponse<{ registration_id: number; promoted_id: number }>>
 }

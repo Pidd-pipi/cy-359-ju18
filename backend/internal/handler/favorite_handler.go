@@ -73,7 +73,8 @@ func (h *FavoriteHandler) List(c *gin.Context) {
 		f := &favorites[i]
 		cpCount, _ := h.activity.CountCheckpoints(f.ActivityID)
 		teamCount, _ := h.activity.CountRegistrations(f.ActivityID)
-		av := service.ToActivityView(&f.Activity, cpCount, teamCount)
+		waitlistCount, _ := h.activity.CountWaitlisted(f.ActivityID)
+		av := service.ToActivityView(&f.Activity, cpCount, teamCount, waitlistCount)
 		views = append(views, service.ToFavoriteView(f, av))
 	}
 	util.OK(c, util.PageResult{List: views, Total: total, Page: pq.Page, PageSize: pq.PageSize})

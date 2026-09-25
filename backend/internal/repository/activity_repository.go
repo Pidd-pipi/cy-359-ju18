@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/orienteering/platform/internal/constants"
 	"github.com/orienteering/platform/internal/model"
 )
 
@@ -94,12 +95,30 @@ func (r *ActivityRepository) CountCheckpoints(activityID int64) (int64, error) {
 	return count, nil
 }
 
+// CountRegistrations 统计活动已占用名额的报名数（pending/approved/finished）。
+// 待审核同样占用名额，避免管理员全部通过后正式队伍超过 MaxTeams。
 func (r *ActivityRepository) CountRegistrations(activityID int64) (int64, error) {
+	return r.CountOccupied(r.db, activityID)
+}
+
+// CountOccupied 在给定事务/连接内统计占用名额的报名数（与 SELECT ... FOR UPDATE 同事务，保证并发下名额判定准确）。
+func (r *ActivityRepository) CountOccupied(tx *gorm.DB, activityID int64) (int64, error) {
+	var count int64
+	if err := tx.Model(&model.Registration{}).
+		Where("activity_id = ? AND status IN ?", activityID,
+			constants.RegistrationStatusSlotOccupied).Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count occupied registrations: %w", err)
+	}
+	return count, nil
+}
+
+// CountWaitlisted 统计活动候补队列中的队伍数（候补不占名额）。
+func (r *ActivityRepository) CountWaitlisted(activityID int64) (int64, error) {
 	var count int64
 	if err := r.db.Model(&model.Registration{}).
-		Where("activity_id = ? AND status IN ?", activityID,
-			[]string{"approved", "finished"}).Count(&count).Error; err != nil {
-		return 0, fmt.Errorf("count registrations: %w", err)
+		Where("activity_id = ? AND status = ?", activityID,
+			constants.RegistrationStatusWaitlisted).Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count waitlisted registrations: %w", err)
 	}
 	return count, nil
 }
@@ -109,4 +128,20 @@ func (r *ActivityRepository) Delete(id int64) error {
 		return fmt.Errorf("delete activity: %w", err)
 	}
 	return nil
+}
+
+// TitlesByIDs 按 id 批量查询活动标题（报名列表展示复用）。
+func (r *ActivityRepository) TitlesByIDs(ids []int64) (map[int64]string, error) {
+	titles := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return titles, nil
+	}
+	var activities []model.Activity
+	if err := r.db.Select("id", "title").Where("id IN ?", ids).Find(&activities).Error; err != nil {
+		return nil, fmt.Errorf("list activity titles: %w", err)
+	}
+	for i := range activities {
+		titles[activities[i].ID] = activities[i].Title
+	}
+	return titles, nil
 }

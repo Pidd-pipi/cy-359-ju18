@@ -48,8 +48,8 @@ export default function ActivityDetail() {
     }
     setLoading(true)
     try {
-      await teamApi.applyActivity({ team_id: selectedTeam, activity_id: activityId })
-      message.success('报名成功，等待管理员审核')
+      const res = await teamApi.applyActivity({ team_id: selectedTeam, activity_id: activityId })
+      message.success(res.message || '报名成功，等待管理员审核')
       load()
     } catch {
       // 已提示
@@ -91,6 +91,12 @@ export default function ActivityDetail() {
           </Descriptions.Item>
           <Descriptions.Item label="报名情况">
             {activity.team_count}/{activity.max_teams} 队
+            {activity.waitlist_count > 0 && (
+              <Tag color="orange" style={{ marginLeft: 8 }}>候补 {activity.waitlist_count} 队</Tag>
+            )}
+            <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+              （待审核同样占用名额）
+            </Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="开始时间">{formatDateTime(activity.start_time)}</Descriptions.Item>
           <Descriptions.Item label="结束时间">{formatDateTime(activity.end_time)}</Descriptions.Item>

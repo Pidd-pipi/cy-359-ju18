@@ -41,6 +41,8 @@ type RegistrationView struct {
 	ActivityID   int64      `json:"activity_id"`
 	ActivityTitle string    `json:"activity_title"`
 	Status       string     `json:"status"`
+	// WaitlistAhead 候补队伍前面还有多少队（仅 status=waitlisted 时有意义，由 id 提交顺序计算）。
+	WaitlistAhead int       `json:"waitlist_ahead"`
 	StartTime    *time.Time `json:"start_time"`
 	FinishTime   *time.Time `json:"finish_time"`
 	TotalSeconds int        `json:"total_seconds"`

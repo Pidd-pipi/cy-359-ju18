@@ -121,7 +121,12 @@ func (h *ActivityHandler) List(c *gin.Context) {
 			respondError(c, err2)
 			return
 		}
-		views = append(views, service.ToActivityView(&activities[i], cpCount, teamCount))
+		waitlistCount, err3 := h.svc.CountWaitlisted(activities[i].ID)
+		if err3 != nil {
+			respondError(c, err3)
+			return
+		}
+		views = append(views, service.ToActivityView(&activities[i], cpCount, teamCount, waitlistCount))
 	}
 	util.OK(c, util.PageResult{List: views, Total: total, Page: pq.Page, PageSize: pq.PageSize})
 }
@@ -148,7 +153,12 @@ func (h *ActivityHandler) Get(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	util.OK(c, service.ToActivityView(activity, cpCount, teamCount))
+	waitlistCount, err := h.svc.CountWaitlisted(id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	util.OK(c, service.ToActivityView(activity, cpCount, teamCount, waitlistCount))
 }
 
 // Delete 删除活动（管理员）。

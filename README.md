@@ -58,7 +58,7 @@ npm run dev
 
 1. **活动线路设计与发布**：管理员创建线路（起点/终点坐标、难度、时长、装备要求），在线路上设置打卡点（CP 点：坐标、线索、答题/拍照任务、二维码、打卡半径），发布、开始、结束活动。
 2. **线索打卡点（GPS/二维码）**：参与者到点后通过 GPS 距离校验或二维码完成打卡；答题任务校验答案，正确获得额外积分；系统记录到达时间。
-3. **团队报名与排名**：用户创建/加入团队（队长报名），管理员审核；活动开始后记录各团队总用时，按用时实时排名，WebSocket 实时推送榜单。
+3. **团队报名与排名**：用户创建/加入团队（队长报名），管理员审核。**待审核同样占用名额**，名额不足时新报名按提交顺序进入**候补（waitlisted）**；管理员拒绝待审核后，最早候补自动递补为待审核（同一事务内完成）。活动开始后记录各团队总用时，按用时实时排名，WebSocket 实时推送榜单。
 4. **积分兑换商城**：参与打卡获得积分，可在商城兑换户外装备/活动优惠券/虚拟勋章；兑换订单由管理员处理。
 5. **历史线路收藏**：已结束的线路可收藏，方便下次报名参考。
 
@@ -174,10 +174,10 @@ cy-359/
 | POST | /teams/:id/join | 加入团队 | 登录 |
 | DELETE | /teams/:id/leave | 退出团队 | 登录 |
 | GET | /teams | 团队列表 | 管理员 |
-| POST | /registrations | 团队报名活动（队长） | 登录 |
-| GET | /registrations/mine | 我的报名记录 | 登录 |
-| POST | /registrations/:id/approve | 通过报名 | 管理员 |
-| POST | /registrations/:id/reject | 拒绝报名 | 管理员 |
+| POST | /registrations | 团队报名活动（队长；名额足→待审核，名额不足→候补） | 登录 |
+| GET | /registrations/mine | 我的报名记录（含候补排位 waitlist_ahead） | 登录 |
+| POST | /registrations/:id/approve | 通过报名（仅待审核；候补不可直接通过） | 管理员 |
+| POST | /registrations/:id/reject | 拒绝报名（拒绝待审核时最早候补同事务自动递补） | 管理员 |
 
 ### 打卡与排行榜
 | 方法 | 路径 | 说明 | 权限 |
@@ -212,7 +212,7 @@ cy-359/
 
 1. `GET /activities/:id/leaderboard`（排行榜）与 `POST /teams/:id/checkin`（打卡）都复用 `LeaderboardService.Leaderboard` / `LeaderboardService.Invalidate` 完成榜单计算与缓存失效。
 2. `GET /activities` 列表 与 `GET /favorites` 收藏列表 复用 `ActivityService.CountCheckpoints` / `ActivityService.CountRegistrations` 统计打卡点与报名数。
-3. `POST /activities/:id/transition`（开始活动）复用 `RegistrationService.Start` 为已通过团队记录开始时间；`GET /activities/:id/registrations` 与 `GET /registrations/mine` 复用 `ToRegistrationView` 视图转换。
+3. `POST /activities/:id/transition`（开始活动）复用 `RegistrationService.Start` 为已通过团队记录开始时间；`GET /activities/:id/registrations` 与 `GET /registrations/mine` 复用 `RegistrationService.ToViews` 视图转换（补全团队名/活动标题/候补排位）；`GET /activities`、`GET /activities/:id`、`GET /favorites` 复用 `CountRegistrations`（待审核占名额）与 `CountWaitlisted`（候补数）统计。
 
 ## curl 调用示例
 
@@ -264,9 +264,10 @@ curl -sS http://localhost:29519/healthz
 - 后端：`internal/constants/enums.go`、`internal/model/checkpoint.go`、`internal/model/checkin_record.go`、`internal/dto/checkpoint_dto.go`（oneof）、`internal/dto/checkin_dto.go`（oneof）、`internal/service/checkin_service.go`（答题/拍照/GPS 距离校验）、`internal/util/formatters.go`（TaskTypeText）、`internal/constants/messages.go`（MsgWrongAnswer）
 - 前端：`src/constants/index.ts`（TaskType/CheckinType/taskTypeConfig）、`src/pages/ActivityDetail.tsx`、`src/pages/ActivityManage.tsx`（打卡点表单）、`src/pages/Checkin.tsx`（打卡方式与答题）
 
-### 枚举 5：报名状态 RegistrationStatus（pending / approved / rejected / finished）
-- 后端：`internal/constants/enums.go`、`internal/model/team.go`（Registration）、`internal/service/registration_service.go`（审核状态机）、`internal/service/checkin_service.go`（仅 approved 可打卡、完成后置 finished）、`internal/service/leaderboard_service.go`（榜单只统计 approved/finished）、`internal/handler/registration_handler.go`、`internal/util/formatters.go`（RegistrationStatusText）、`internal/constants/log_templates.go`（LogTeamApprove/LogTeamFinish）
-- 前端：`src/constants/index.ts`（RegistrationStatus）、`src/pages/TeamDetail.tsx`、`src/pages/ActivityManage.tsx`（审核报名）、`src/components/Leaderboard.tsx`、`src/components/StatusBadge.tsx`
+### 枚举 5：报名状态 RegistrationStatus（pending / waitlisted / approved / rejected / finished）
+- 状态机：报名时名额足→`pending`（占用名额）、名额不足→`waitlisted`（候补，按 id 提交顺序排队）；`pending`→`approved`（通过，占位不变）；拒绝 `pending`→`rejected` 并在**同一事务**把最早 `waitlisted` 自动置为 `pending`；拒绝 `waitlisted` 不触发递补；活动开始后打卡完赛 `approved`→`finished`。
+- 后端：`internal/constants/enums.go`（状态与 `RegistrationStatusSlotOccupied` 占位集合）、`internal/constants/error_codes.go`（CodeWaitlisted/CodeAlreadyApplied/CodeConflict）、`internal/constants/messages.go`（MsgWaitlisted/MsgPromotedFromWaitlist）、`internal/constants/log_templates.go`（LogTeamApply 占位日志、LogTeamReject、LogTeamWaitlistPromote）、`internal/model/team.go`（Registration）、`internal/dto/team_dto.go`（RegistrationView.WaitlistAhead）、`internal/service/registration_service.go`（报名/审核/拒绝/递补状态机，活动行 `SELECT ... FOR UPDATE` + CAS UpdateStatusCAS）、`internal/repository/team_repository.go`（FirstWaitlistedForUpdate/CountWaitlistedBefore/UpdateStatusCAS/GetByTeamAndActivityForUpdate）、`internal/repository/activity_repository.go`（CountOccupied/CountWaitlisted）、`internal/service/checkin_service.go`（仅 approved 可打卡、完成后置 finished）、`internal/service/leaderboard_service.go`（榜单只统计 approved/finished）、`internal/handler/registration_handler.go`、`internal/util/formatters.go`（RegistrationStatusText/StatusColor 的 waitlisted 分支）
+- 前端：`src/constants/index.ts`（RegistrationStatus.WAITLISTED/statusConfig）、`src/api/team.ts`（waitlist_ahead）、`src/api/activity.ts`（waitlist_count）、`src/components/RegistrationStatusTag.tsx`（状态+候补排位共享组件）、`src/pages/TeamDetail.tsx`、`src/pages/ActivityManage.tsx`（审核报名、按钮按状态显隐）、`src/pages/ActivityDetail.tsx`、`src/components/ActivityCard.tsx`、`src/components/Leaderboard.tsx`、`src/components/StatusBadge.tsx`
 
 ### 枚举 6：商品/兑换（ProductType、ProductStatus、RedemptionStatus）
 - 后端：`internal/constants/enums.go`、`internal/model/product.go`、`internal/model/redemption.go`、`internal/dto/product_dto.go`（oneof）、`internal/service/redemption_service.go`（兑换状态机：pending→completed/cancelled）、`internal/service/product_service.go`、`internal/handler/product_handler.go`、`internal/handler/redemption_handler.go`、`internal/util/formatters.go`（RedemptionStatusText/ProductTypeText/StatusColor）

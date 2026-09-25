@@ -33,6 +33,8 @@ export interface Activity {
   max_teams: number
   checkpoint_count: number
   team_count: number
+  /** 候补队列中的队伍数（候补不占用名额） */
+  waitlist_count: number
   checkpoints?: Checkpoint[]
   created_at: string
 }

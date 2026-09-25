@@ -37,11 +37,18 @@ const (
 
 // 报名状态枚举（数据库 registrations.status 字段）。
 const (
-	RegistrationStatusPending  = "pending"  // 待审核
-	RegistrationStatusApproved = "approved" // 已通过
-	RegistrationStatusRejected = "rejected" // 已拒绝
-	RegistrationStatusFinished = "finished" // 已完成
+	RegistrationStatusPending    = "pending"    // 待审核（已占用名额）
+	RegistrationStatusWaitlisted = "waitlisted" // 候补（名额不足，按提交顺序排队，不占名额）
+	RegistrationStatusApproved   = "approved"   // 已通过（占用名额）
+	RegistrationStatusRejected   = "rejected"   // 已拒绝
+	RegistrationStatusFinished   = "finished"   // 已完成（占用名额）
 )
+
+// RegistrationStatusSlotOccupied 占用名额的报名状态：待审核同样占位，
+// 保证管理员把全部待审核通过后正式队伍也不会超过 MaxTeams。
+var RegistrationStatusSlotOccupied = []string{
+	RegistrationStatusPending, RegistrationStatusApproved, RegistrationStatusFinished,
+}
 
 // 商城商品类型枚举（数据库 products.type 字段）。
 const (
@@ -87,7 +94,7 @@ var AllDifficulties = []string{DifficultyFamily, DifficultyAdult, DifficultyPro}
 
 // AllRegistrationStatuses 报名状态完整列表。
 var AllRegistrationStatuses = []string{
-	RegistrationStatusPending, RegistrationStatusApproved,
+	RegistrationStatusPending, RegistrationStatusWaitlisted, RegistrationStatusApproved,
 	RegistrationStatusRejected, RegistrationStatusFinished,
 }
 

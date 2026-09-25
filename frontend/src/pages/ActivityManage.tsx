@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, DatePicker, Table, message, Popconfirm,
+  Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, DatePicker, Table, message, Popconfirm, Tag, Typography,
 } from 'antd'
 import dayjs from 'dayjs'
 import * as activityApi from '../api/activity'
@@ -8,8 +8,9 @@ import * as checkpointApi from '../api/checkpoint'
 import * as teamApi from '../api/team'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
+import RegistrationStatusTag from '../components/RegistrationStatusTag'
 import { useAuth } from '../hooks/useAuth'
-import { ActivityStatus, Difficulty, TaskType } from '../constants'
+import { ActivityStatus, Difficulty, TaskType, RegistrationStatus } from '../constants'
 import { formatDateTime } from '../utils/format'
 
 export default function ActivityManage() {
@@ -265,28 +266,11 @@ function CheckpointManager({ activity, onClose, onChanged }: { activity: activit
     const res = await teamApi.listRegistrationsByActivity(activity.id)
     Modal.info({
       title: `报名列表（${activity.title}）`,
-      width: 640,
+      width: 760,
       content: (
-        <Table
-          size="small"
-          rowKey="id"
-          dataSource={res.data}
-          pagination={false}
-          columns={[
-            { title: '报名 ID', dataIndex: 'id', width: 80 },
-            { title: '团队 ID', dataIndex: 'team_id', width: 90 },
-            { title: '状态', dataIndex: 'status' },
-            { title: '用时', dataIndex: 'duration' },
-            {
-              title: '操作',
-              render: (_, r) => (
-                <Space>
-                  <Button size="small" type="primary" onClick={async () => { await teamApi.approveRegistration(r.id); message.success('已通过'); onRegistrations(); }}>通过</Button>
-                  <Button size="small" danger onClick={async () => { await teamApi.rejectRegistration(r.id); message.success('已拒绝'); onRegistrations(); }}>拒绝</Button>
-                </Space>
-              ),
-            },
-          ]}
+        <RegistrationAuditTable
+          activity={activity}
+          initial={res.data}
         />
       ),
     })
@@ -337,5 +321,110 @@ function CheckpointManager({ activity, onClose, onChanged }: { activity: activit
         </>
       )}
     </Modal>
+  )
+}
+
+// RegistrationAuditTable 活动报名审核表：展示待审核/候补/已通过等状态，
+// 候补显示前面还有几队；拒绝待审核后最早候补由后端自动递补。
+function RegistrationAuditTable({ activity, initial }: {
+  activity: activityApi.Activity
+  initial: teamApi.Registration[]
+}) {
+  const [rows, setRows] = useState<teamApi.Registration[]>(initial)
+  const [busyId, setBusyId] = useState<number>()
+
+  const refresh = async () => {
+    const res = await teamApi.listRegistrationsByActivity(activity.id)
+    setRows(res.data)
+  }
+
+  const occupied = rows.filter(
+    (r) => r.status === RegistrationStatus.PENDING
+      || r.status === RegistrationStatus.APPROVED
+      || r.status === RegistrationStatus.FINISHED,
+  ).length
+  const waitlistCount = rows.filter((r) => r.status === RegistrationStatus.WAITLISTED).length
+
+  const onApprove = async (r: teamApi.Registration) => {
+    setBusyId(r.id)
+    try {
+      await teamApi.approveRegistration(r.id)
+      message.success('已通过')
+      await refresh()
+    } catch {
+      // 已提示
+    } finally {
+      setBusyId(undefined)
+    }
+  }
+
+  const onReject = async (r: teamApi.Registration) => {
+    setBusyId(r.id)
+    try {
+      const res = await teamApi.rejectRegistration(r.id)
+      message.success(res.message || '已拒绝')
+      await refresh()
+    } catch {
+      // 已提示
+    } finally {
+      setBusyId(undefined)
+    }
+  }
+
+  return (
+    <div>
+      <Space style={{ marginBottom: 8 }}>
+        <Tag color="blue">名额 {occupied}/{activity.max_teams}</Tag>
+        <Tag color="orange">候补 {waitlistCount} 队</Tag>
+        <Typography.Text type="secondary">待审核同样占用名额；拒绝待审核后最早候补自动递补</Typography.Text>
+      </Space>
+      <Table
+        size="small"
+        rowKey="id"
+        dataSource={rows}
+        pagination={false}
+        scroll={{ y: 360 }}
+        columns={[
+          { title: '报名 ID', dataIndex: 'id', width: 72 },
+          { title: '团队', dataIndex: 'team_name', render: (v: string, r: teamApi.Registration) => v || `团队 #${r.team_id}` },
+          {
+            title: '状态',
+            dataIndex: 'status',
+            width: 170,
+            render: (_: string, r: teamApi.Registration) => (
+              <RegistrationStatusTag status={r.status} waitlistAhead={r.waitlist_ahead} />
+            ),
+          },
+          { title: '用时', dataIndex: 'duration', width: 90 },
+          {
+            title: '操作',
+            width: 150,
+            render: (_, r: teamApi.Registration) => {
+              // 只有待审核可通过；候补不能直接通过，必须等名额释放后按顺序递补。
+              const canApprove = r.status === RegistrationStatus.PENDING
+              const canReject = r.status === RegistrationStatus.PENDING || r.status === RegistrationStatus.WAITLISTED
+              if (!canApprove && !canReject) return null
+              return (
+                <Space>
+                  {canApprove && (
+                    <Button size="small" type="primary" loading={busyId === r.id} onClick={() => onApprove(r)}>通过</Button>
+                  )}
+                  {canReject && (
+                    <Popconfirm
+                      title={r.status === RegistrationStatus.PENDING
+                        ? '拒绝后将释放名额，最早候补自动递补为待审核，确定？'
+                        : '确定将该队伍移出候补队列？'}
+                      onConfirm={() => onReject(r)}
+                    >
+                      <Button size="small" danger loading={busyId === r.id}>拒绝</Button>
+                    </Popconfirm>
+                  )}
+                </Space>
+              )
+            },
+          },
+        ]}
+      />
+    </div>
   )
 }
